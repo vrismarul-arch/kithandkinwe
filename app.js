@@ -7,6 +7,8 @@ const clientRoutes = require("./routes/clientRoutes");
 const businessRoutes = require("./routes/businessRoutes");
 const leadRoutes = require("./routes/leadRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
+const projectRoutes = require("./routes/projectRoutes");
+const eventRoutes = require("./routes/eventRoutes");
 const authenticate = require("./middleware/authenticate");
 const invoiceRoutes = require("./routes/invoiceRoutes");
 
@@ -59,7 +61,10 @@ app.use("/api/clients", authenticate, clientRoutes);
 app.use("/api/businesses", authenticate, businessRoutes);
 app.use("/api/leads", authenticate, leadRoutes);
 app.use("/api/services", authenticate, serviceRoutes);
+app.use("/api/projects", authenticate, projectRoutes);
+app.use("/api/events", authenticate, eventRoutes);
 app.use("/api/invoices", invoiceRoutes);
+
 app.use(notFound);
 app.use(errorHandler);
 

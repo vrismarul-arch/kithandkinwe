@@ -29,7 +29,13 @@ function normalizeRow(row) {
     ...row,
     servicesPromised: parseJsonArray(row.servicesPromised),
     deliverables: parseJsonArray(row.deliverables),
+    termsAndConditions: parseJsonArray(row.termsAndConditions),
     eventDate: toDateOnly(row.eventDate),
+    invoiceDate: toDateOnly(row.invoiceDate),
+    dueDate: toDateOnly(row.dueDate),
+    discountValue: row.discountValue != null ? Number(row.discountValue) : 0,
+    taxPercent: row.taxPercent != null ? Number(row.taxPercent) : 18,
+    projectValue: row.projectValue != null ? Number(row.projectValue) : 0,
   };
 }
 
@@ -54,7 +60,12 @@ const InvoiceModel = {
 
   async create({
     invoiceNo,
+    invoiceDate,
+    dueDate,
     clientName,
+    clientAddress,
+    clientPhone,
+    clientEmail,
     eventType,
     eventDate,
     venue,
@@ -64,17 +75,27 @@ const InvoiceModel = {
     complimentary,
     deliveryNote,
     projectValue,
+    discountType,
+    discountValue,
+    taxPercent,
+    termsAndConditions,
     status,
   }) {
     const [result] = await pool.query(
       `INSERT INTO ${TABLE} (
-        invoiceNo, clientName, eventType, eventDate, venue, maxHours,
+        invoiceNo, invoiceDate, dueDate, clientName, clientAddress, clientPhone, clientEmail,
+        eventType, eventDate, venue, maxHours,
         servicesPromised, deliverables, complimentary, deliveryNote,
-        projectValue, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        projectValue, discountType, discountValue, taxPercent, termsAndConditions, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         invoiceNo,
+        invoiceDate || null,
+        dueDate || null,
         clientName,
+        clientAddress || null,
+        clientPhone || null,
+        clientEmail || null,
         eventType,
         eventDate,
         venue,
@@ -84,6 +105,10 @@ const InvoiceModel = {
         complimentary || null,
         deliveryNote || null,
         projectValue,
+        discountType || "flat",
+        discountValue || 0,
+        taxPercent != null ? taxPercent : 18,
+        JSON.stringify(termsAndConditions || []),
         status || "Draft",
       ]
     );
@@ -93,7 +118,12 @@ const InvoiceModel = {
   async update(id, data) {
     const allowed = [
       "invoiceNo",
+      "invoiceDate",
+      "dueDate",
       "clientName",
+      "clientAddress",
+      "clientPhone",
+      "clientEmail",
       "eventType",
       "eventDate",
       "venue",
@@ -103,6 +133,10 @@ const InvoiceModel = {
       "complimentary",
       "deliveryNote",
       "projectValue",
+      "discountType",
+      "discountValue",
+      "taxPercent",
+      "termsAndConditions",
       "status",
     ];
 
@@ -111,7 +145,7 @@ const InvoiceModel = {
 
     const setClause = keys.map((k) => `${k} = ?`).join(", ");
     const values = keys.map((k) => {
-      if (k === "servicesPromised" || k === "deliverables") {
+      if (k === "servicesPromised" || k === "deliverables" || k === "termsAndConditions") {
         return JSON.stringify(data[k] || []);
       }
       return data[k];
