@@ -19,7 +19,7 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5173", // Vite dev server
   "https://kithandkin.netlify.app", // in case you also run CRA/other tooling
-  // "https://your-frontend-domain.com", // 👈 add your production frontend URL here
+   "https://kithandkinweddings.in", // 👈 add your production frontend URL here
 ];
 
 const corsOptions = {
