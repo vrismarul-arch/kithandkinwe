@@ -1,6 +1,9 @@
 const express = require("express");
 const cors = require("cors");
 
+// =======================================
+// ROUTES
+// =======================================
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const clientRoutes = require("./routes/clientRoutes");
@@ -9,57 +12,229 @@ const leadRoutes = require("./routes/leadRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const eventRoutes = require("./routes/eventRoutes");
-const authenticate = require("./middleware/authenticate");
 const invoiceRoutes = require("./routes/invoiceRoutes");
 const eventGalleryRoutes = require("./routes/eventGalleryRoutes");
-const { notFound, errorHandler } = require("./middleware/errorHandler");
+
+// =======================================
+// MIDDLEWARE
+// =======================================
+const authenticate = require("./middleware/authenticate");
+const {
+  notFound,
+  errorHandler,
+} = require("./middleware/errorHandler");
 
 const app = express();
 
+// =======================================
+// CORS
+// =======================================
 const allowedOrigins = [
-  "http://localhost:5173", // Vite dev server
-  "https://kithandkin.netlify.app", // in case you also run CRA/other tooling
-   "https://kithandkinweddings.in", // 👈 add your production frontend URL here
+  // Local development
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+
+  // Production frontend
+  "https://kithandkin.netlify.app",
+  "https://kithandkinweddings.in",
+  "https://www.kithandkinweddings.in",
 ];
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // allow requests with no origin (curl, Postman, server-to-server)
-    if (!origin) return callback(null, true);
+    // Allow Postman, curl and server-to-server requests
+    if (!origin) {
+      return callback(null, true);
+    }
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+    console.log("❌ CORS blocked:", origin);
+
+    return callback(
+      new Error(`Origin ${origin} not allowed by CORS`)
+    );
   },
+
   credentials: true,
+
+  methods: [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+  ],
+
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+  ],
 };
 
 app.use(cors(corsOptions));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Handle preflight requests
+app.options("*", cors(corsOptions));
 
-app.get("/api/health", (req, res) => res.json({ status: "ok" }));
+// =======================================
+// BODY PARSER
+// =======================================
+app.use(express.json({ limit: "50mb" }));
 
-// Public
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "50mb",
+  })
+);
+
+// =======================================
+// REQUEST LOGGER
+// =======================================
+app.use((req, res, next) => {
+  console.log(
+    `${new Date().toISOString()} | ${req.method} ${req.originalUrl}`
+  );
+
+  next();
+});
+
+// =======================================
+// ROOT TEST ROUTE
+// =======================================
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Kith & Kin Weddings Backend is running",
+    status: "online",
+    environment: process.env.NODE_ENV || "production",
+    port: process.env.PORT || 2000,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// =======================================
+// API TEST ROUTE
+// =======================================
+app.get("/api/test", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Test API working successfully",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// =======================================
+// HEALTH CHECK
+// =======================================
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    status: "ok",
+    message: "Backend and API are running",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// =======================================
+// PUBLIC AUTH ROUTES
+// =======================================
 app.use("/api/auth", authRoutes);
 
-// Protected — requires a valid Bearer token from /api/auth/login
-app.use("/api/users", authenticate, userRoutes);
-app.use("/api/clients", authenticate, clientRoutes);
-app.use("/api/businesses", authenticate, businessRoutes);
-app.use("/api/leads", authenticate, leadRoutes);
-app.use("/api/services", authenticate, serviceRoutes);
-app.use("/api/projects", authenticate, projectRoutes);
-app.use("/api/events", authenticate, eventRoutes);
-app.use("/api/invoices", invoiceRoutes);
+// =======================================
+// PROTECTED USER ROUTES
+// =======================================
+app.use(
+  "/api/users",
+  authenticate,
+  userRoutes
+);
+
+// =======================================
+// PROTECTED CLIENT ROUTES
+// =======================================
+app.use(
+  "/api/clients",
+  authenticate,
+  clientRoutes
+);
+
+// =======================================
+// PROTECTED BUSINESS ROUTES
+// =======================================
+app.use(
+  "/api/businesses",
+  authenticate,
+  businessRoutes
+);
+
+// =======================================
+// PROTECTED LEAD ROUTES
+// =======================================
+app.use(
+  "/api/leads",
+  authenticate,
+  leadRoutes
+);
+
+// =======================================
+// PROTECTED SERVICE ROUTES
+// =======================================
+app.use(
+  "/api/services",
+  authenticate,
+  serviceRoutes
+);
+
+// =======================================
+// PROTECTED PROJECT ROUTES
+// =======================================
+app.use(
+  "/api/projects",
+  authenticate,
+  projectRoutes
+);
+
+// =======================================
+// PROTECTED EVENT ROUTES
+// =======================================
+app.use(
+  "/api/events",
+  authenticate,
+  eventRoutes
+);
+
+// =======================================
+// INVOICE ROUTES
+// =======================================
+app.use(
+  "/api/invoices",
+  invoiceRoutes
+);
+
+// =======================================
+// EVENT GALLERY ROUTES
+// =======================================
 app.use(
   "/api/event-gallery",
   eventGalleryRoutes
 );
+
+// =======================================
+// 404 - ROUTE NOT FOUND
+// =======================================
 app.use(notFound);
+
+// =======================================
+// GLOBAL ERROR HANDLER
+// =======================================
 app.use(errorHandler);
 
+// =======================================
+// EXPORT APP
+// =======================================
 module.exports = app;
