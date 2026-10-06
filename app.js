@@ -11,16 +11,11 @@ const projectRoutes = require("./routes/projectRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const authenticate = require("./middleware/authenticate");
 const invoiceRoutes = require("./routes/invoiceRoutes");
-
+const eventGalleryRoutes = require("./routes/eventGalleryRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
 
-// ===========================
-// CORS
-// ===========================
-// List every frontend origin that's allowed to call this API.
-// Add your deployed frontend URL here once it's live (e.g. Vercel/Netlify/Render URL).
 const allowedOrigins = [
   "http://localhost:5173", // Vite dev server
   "https://kithandkin.netlify.app", // in case you also run CRA/other tooling
@@ -41,10 +36,6 @@ const corsOptions = {
   credentials: true,
 };
 
-// NOTE: mounting cors() as global middleware is enough — it automatically
-// intercepts and responds to OPTIONS preflight requests for every route.
-// (No need for a separate app.options("*", ...) line — on Express 5 that
-// wildcard syntax actually throws at startup and crashes the server.)
 app.use(cors(corsOptions));
 
 app.use(express.json());
@@ -64,7 +55,10 @@ app.use("/api/services", authenticate, serviceRoutes);
 app.use("/api/projects", authenticate, projectRoutes);
 app.use("/api/events", authenticate, eventRoutes);
 app.use("/api/invoices", invoiceRoutes);
-
+app.use(
+  "/api/event-gallery",
+  eventGalleryRoutes
+);
 app.use(notFound);
 app.use(errorHandler);
 
