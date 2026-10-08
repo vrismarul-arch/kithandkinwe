@@ -7,20 +7,25 @@ const TABLE = "invoices";
 function normalizeRow(row) {
   if (!row) return row;
 
-  const parseJsonArray = (val) => (Array.isArray(val) ? val : val ? JSON.parse(val) : []);
+  const parseJsonArray = (val) => {
+    if (Array.isArray(val)) return val;
+    if (!val) return [];
+    try {
+      return JSON.parse(val);
+    } catch {
+      return [];
+    }
+  };
 
-  // MySQL DATE/DATETIME columns can come back as JS Date objects
-  // (depending on driver config), which serialize/display as
-  // "Mon Aug 03 2026 00:00:00 GMT+0530 (India Standard Time)".
-  // Force them to a plain "YYYY-MM-DD" string instead, regardless
-  // of whether the driver handed us a Date object or an ISO string.
+  // MySQL DATE/DATETIME columns can come back as JS Date objects.
+  // Force them to a plain "YYYY-MM-DD" string.
   const toDateOnly = (val) => {
     if (!val) return val;
     if (val instanceof Date) {
       return val.toISOString().split("T")[0]; // "2026-08-03"
     }
     if (typeof val === "string") {
-      return val.split("T")[0]; // already a string (ISO or plain) -> strip time part if present
+      return val.split("T")[0];
     }
     return val;
   };
@@ -38,6 +43,34 @@ function normalizeRow(row) {
     projectValue: row.projectValue != null ? Number(row.projectValue) : 0,
   };
 }
+
+// Columns used for INSERT. The "?" placeholders are generated from this
+// list, so the column count and value count can never mismatch again.
+const INSERT_COLUMNS = [
+  "invoiceNo",
+  "invoiceDate",
+  "dueDate",
+  "clientName",
+  "clientAddress",
+  "clientPhone",
+  "clientEmail",
+  "eventType",
+  "eventDate",
+  "venue",
+  "maxHours",
+  "servicesPromised",
+  "deliverables",
+  "complimentary",
+  "deliveryNote",
+  "projectValue",
+  "discountType",
+  "discountValue",
+  "taxPercent",
+  "termsAndConditions",
+  "status",
+];
+
+const JSON_COLUMNS = ["servicesPromised", "deliverables", "termsAndConditions"];
 
 const InvoiceModel = {
   async findAll() {
@@ -81,75 +114,51 @@ const InvoiceModel = {
     termsAndConditions,
     status,
   }) {
+    // Must follow the exact same order as INSERT_COLUMNS
+    const values = [
+      invoiceNo,
+      invoiceDate || null,
+      dueDate || null,
+      clientName,
+      clientAddress || null,
+      clientPhone || null,
+      clientEmail || null,
+      eventType,
+      eventDate,
+      venue,
+      maxHours || null,
+      JSON.stringify(servicesPromised || []),
+      JSON.stringify(deliverables || []),
+      complimentary || null,
+      deliveryNote || null,
+      projectValue,
+      discountType || "flat",
+      discountValue || 0,
+      taxPercent != null ? taxPercent : 18,
+      JSON.stringify(termsAndConditions || []),
+      status || "Draft",
+    ];
+
+    const placeholders = INSERT_COLUMNS.map(() => "?").join(", ");
+
     const [result] = await pool.query(
-      `INSERT INTO ${TABLE} (
-        invoiceNo, invoiceDate, dueDate, clientName, clientAddress, clientPhone, clientEmail,
-        eventType, eventDate, venue, maxHours,
-        servicesPromised, deliverables, complimentary, deliveryNote,
-        projectValue, discountType, discountValue, taxPercent, termsAndConditions, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        invoiceNo,
-        invoiceDate || null,
-        dueDate || null,
-        clientName,
-        clientAddress || null,
-        clientPhone || null,
-        clientEmail || null,
-        eventType,
-        eventDate,
-        venue,
-        maxHours || null,
-        JSON.stringify(servicesPromised || []),
-        JSON.stringify(deliverables || []),
-        complimentary || null,
-        deliveryNote || null,
-        projectValue,
-        discountType || "flat",
-        discountValue || 0,
-        taxPercent != null ? taxPercent : 18,
-        JSON.stringify(termsAndConditions || []),
-        status || "Draft",
-      ]
+      `INSERT INTO ${TABLE} (${INSERT_COLUMNS.join(", ")}) VALUES (${placeholders})`,
+      values
     );
+
     return this.findById(result.insertId);
   },
 
   async update(id, data) {
-    const allowed = [
-      "invoiceNo",
-      "invoiceDate",
-      "dueDate",
-      "clientName",
-      "clientAddress",
-      "clientPhone",
-      "clientEmail",
-      "eventType",
-      "eventDate",
-      "venue",
-      "maxHours",
-      "servicesPromised",
-      "deliverables",
-      "complimentary",
-      "deliveryNote",
-      "projectValue",
-      "discountType",
-      "discountValue",
-      "taxPercent",
-      "termsAndConditions",
-      "status",
-    ];
-
-    const keys = Object.keys(data).filter((k) => allowed.includes(k) && data[k] !== undefined);
+    const keys = Object.keys(data).filter(
+      (k) => INSERT_COLUMNS.includes(k) && data[k] !== undefined
+    );
     if (keys.length === 0) return this.findById(id);
 
     const setClause = keys.map((k) => `${k} = ?`).join(", ");
-    const values = keys.map((k) => {
-      if (k === "servicesPromised" || k === "deliverables" || k === "termsAndConditions") {
-        return JSON.stringify(data[k] || []);
-      }
-      return data[k];
-    });
+    const values = keys.map((k) =>
+      JSON_COLUMNS.includes(k) ? JSON.stringify(data[k] || []) : data[k]
+    );
     values.push(id);
 
     await pool.query(`UPDATE ${TABLE} SET ${setClause} WHERE id = ?`, values);
